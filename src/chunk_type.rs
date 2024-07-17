@@ -1,8 +1,5 @@
 use std::str::FromStr;
 
-
-
-
 /// A 4-byte chunk type code. Type codes are restricted to consist of uppercase and lowercase ASCII letters
 /// (A-Z and a-z, or 65-90 and 97-122 decimal). However, encoders and decoders must treat the codes as fixed
 /// binary values, not character strings. For example, it would not be correct to represent the type code
@@ -20,21 +17,18 @@ impl ChunkType {
     pub fn bytes(&self) -> [u8; 4] {
         [self.ancillary, self.private, self.reserved, self.safe_to_copy]
     }
-    
-    fn is_valid_bit(&self, bit: u8) -> bool {
-        if (bit >= b'A' && bit <= b'Z') || (bit >= b'a' && bit <= b'z') {
-            true
-        } else {
-            false
-        }
-    }
 
     /// Checks whether the Chunk Type is a valid chunk type
+    /// A valid chunk type has:
+    /// - ancillary byte as ascii alphabetic
+    /// - private byte as ascii alphabetic
+    /// - reserved byte as ascii Uppercase
+    /// - safe to copy byte as ascii alphabetic
     pub fn is_valid(&self) -> bool {
-        self.is_valid_bit(self.ancillary) &&
-        self.is_valid_bit(self.private) &&
-        self.is_valid_bit(self.reserved) &&
-        self.is_valid_bit(self.safe_to_copy)
+        self.ancillary.is_ascii_alphabetic() &&
+        self.private.is_ascii_alphabetic() &&
+        self.reserved.is_ascii_uppercase() &&
+        self.safe_to_copy.is_ascii_alphabetic()
     }
 }
 
@@ -42,17 +36,18 @@ impl TryFrom<[u8; 4]> for ChunkType {
     type Error = &'static str;
 
     fn try_from(value: [u8; 4]) -> Result<Self, Self::Error> {
-        let chunk = ChunkType {
+        for i in 0..4 {
+            let byte = value[i];
+            if !byte.is_ascii_uppercase() && !byte.is_ascii_lowercase() {
+                return Err("Invalid Type Code");
+            }
+        }
+        Ok(ChunkType {
             ancillary: value[0],
             private: value[1],
             reserved: value[2],
             safe_to_copy: value[3]
-        };
-        if chunk.is_valid() {
-            Ok(chunk)
-        } else {
-            Err("Invalid Type Code")
-        }
+        })
     }
 }
 
@@ -61,18 +56,18 @@ impl FromStr for ChunkType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let str_bytes = value.as_bytes();
-        let chunk = ChunkType {
+        for i in 0..4 {
+            let byte = str_bytes[i];
+            if !byte.is_ascii_uppercase() && !byte.is_ascii_lowercase() {
+                return Err("Invalid Type Code");
+            }
+        }
+        Ok(ChunkType {
             ancillary: str_bytes[0],
             private: str_bytes[1],
             reserved: str_bytes[2],
             safe_to_copy: str_bytes[3],
-        };
-        println!("{:?}", chunk);
-        if chunk.is_valid() {
-            Ok(chunk)
-        } else {
-            Err("Invalid Type Code")
-        }
+        })
     }
 }
 
@@ -83,7 +78,6 @@ mod tests {
     use std::convert::TryFrom;
     use std::str::FromStr;
 
-    #[ignore]
     #[test]
     pub fn test_chunk_type_from_bytes() {
         let expected = [82, 117, 83, 116];
@@ -92,7 +86,6 @@ mod tests {
         assert_eq!(expected, actual.bytes());
     }
 
-    #[ignore]
     #[test]
     pub fn test_chunk_type_from_str() {
         let expected = ChunkType::try_from([82, 117, 83, 116]).unwrap();
@@ -148,7 +141,6 @@ mod tests {
     //     assert!(!chunk.is_safe_to_copy());
     // }
 
-    #[ignore]
     #[test]
     pub fn test_valid_chunk_is_valid() {
         let chunk = ChunkType::from_str("RuSt").unwrap();
